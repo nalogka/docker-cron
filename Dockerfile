@@ -13,13 +13,16 @@ RUN apk --no-cache add tzdata \
     && echo "UTC" > /etc/timezone \
     && apk del tzdata
 
-RUN apk --no-cache add bash dcron runit \
-    && echo -e '#!/bin/bash\n\nsed '\''1d; s/Subject: cron for user root docker exec /# /; /^\s*$/d'\'' >/proc/1/fd/1' >/tmp/cron-logger \
+RUN apk --no-cache add dcron runit \
+    && echo -e '#!/bin/sh\n\nsed '\''1d; s/Subject: cron for user root docker exec /# /; /^\s*$/d'\'' >/proc/1/fd/1' >/tmp/cron-logger \
     && chmod 755 /tmp/cron-logger \
+    \
+    && echo -e '#!/bin/sh\nexec 2>/proc/1/fd/2 >/proc/1/fd/1\n\nTARGET="$1"\nshift\nCONTAINER_ID="$1"\nshift\n\necho "Start job \"$@\" ($TARGET)"\ntime -f"Job \"$*\" ($TARGET) done in %E" docker exec "$CONTAINER_ID" "$@"' >/usr/bin/run-job \
+    && chmod 755 /usr/bin/run-job \
     \
     # runit supervisor setup
     && mkdir -p /supervisor/crond \
-      && echo -e '#!/bin/bash\n\nexec 2>&1 crond -f -M/tmp/cron-logger -L/proc/1/fd/1' > /supervisor/crond/run \
+      && echo -e '#!/bin/sh\n\nexec crond -f -M/tmp/cron-logger' > /supervisor/crond/run \
       && chmod 755 /supervisor/crond/run \
     && mkdir -p /supervisor/docker-listener \
     && true

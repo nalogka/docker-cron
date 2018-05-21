@@ -1,19 +1,40 @@
-#!/bin/bash
+#!/bin/sh
 
 exec 2>&1
 
 function rebuild {
   FORMAT_ENV='{{range $idx, $var := .Config.Env}}{{if $idx}}{{"\n"}}{{end}}{{$var}}{{end}}'
-  docker ps -f "status=running" --format '{{.ID}} {{.Names}}' | while read -r ID CONTAINER_NAME
+  # non service task's containers
+  docker ps -f "is-task=false" -f "status=running" --format '{{.ID}} {{.Names}}' | while read -r ID CONTAINER_NAME
   do
-    SECTION_HEADER="# commands of $CONTAINER_NAME\n"
+    SECTION_HEADER="# commands of container $CONTAINER_NAME\n"
     docker inspect --format "$FORMAT_ENV" "$ID" | grep 'CRON_TASK_' | while IFS="=" read -r VAR VAL
     do
-      read -r MIN HOUR DAY MONTH DOW COMMAND <<< "$VAL"
-      echo -ne "$SECTION_HEADER"
-      echo "$MIN $HOUR $DAY $MONTH $DOW docker exec $ID $COMMAND"
+      echo "$VAL" | (
+        read -r MIN HOUR DAY MONTH DOW COMMAND
+        echo -ne "$SECTION_HEADER"
+        echo "$MIN $HOUR $DAY $MONTH $DOW run-job \"container $CONTAINER_NAME\" $ID $COMMAND"
+      )
       SECTION_HEADER=""
     done
+  done
+  # service task's containers
+  docker service ls --format '{{.Name}}' 2>/dev/null | while read -r SERVICE_NAME
+  do
+    ID=$(docker ps -f "status=running" -f "label=com.docker.swarm.service.name=$SERVICE_NAME" -ql 2>/dev/null)
+    if [ -n "$ID" ]
+    then
+      SECTION_HEADER="# commands of service $SERVICE_NAME\n"
+      docker inspect --format "$FORMAT_ENV" "$ID" | grep 'CRON_TASK_' | while IFS="=" read -r VAR VAL
+      do
+        echo "$VAL" | (
+          read -r MIN HOUR DAY MONTH DOW COMMAND
+          echo -ne "$SECTION_HEADER"
+          echo "$MIN $HOUR $DAY $MONTH $DOW run-job \"service $SERVICE_NAME\" $ID $COMMAND"
+        )
+        SECTION_HEADER=""
+      done
+    fi
   done
 }
 
