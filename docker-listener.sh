@@ -48,11 +48,11 @@ function update {
 }
 
 update
-RECENTLY_UPDATED_AT="$(date -Iseconds)"
+RECENTLY_UPDATED_AT="$(date -u "+%Y-%m-%dT%H:%M:%SZ")"
 
 while true
 do
-  NOW="$(date -Iseconds)"
+  NOW="$(date -u "+%Y-%m-%dT%H:%M:%SZ")"
   docker events \
       --filter "type=container" \
       --format "{{.ID}} {{.Status}}" \
