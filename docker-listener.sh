@@ -48,11 +48,17 @@ function update {
 }
 
 update
+RECENTLY_UPDATED_AT="$(date -Iseconds)"
 
-docker events --filter "type=container" --format "{{.ID}} {{.Status}}" | while read -r ID STATUS
+while true
 do
-  case "$STATUS" in
-    start) echo "$ID is running" && update ;;
-    die)   wait_stop "$ID" && echo "$ID has stopped" && update ;;
-  esac
+  NOW="$(date -Iseconds)"
+  docker events \
+      --filter "type=container" \
+      --format "{{.ID}} {{.Status}}" \
+      --since "$RECENTLY_UPDATED_AT" \
+      --until "$NOW" \
+    | grep -E '\b(start|die)\b' && update
+  RECENTLY_UPDATED_AT="$NOW"
+  sleep 5
 done
