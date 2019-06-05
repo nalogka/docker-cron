@@ -7,18 +7,14 @@ ENV LC_ALL en_US.UTF-8
 ENV LANG en_US.UTF-8
 
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
-
 RUN apk --no-cache add tzdata \
     && cp /usr/share/zoneinfo/Etc/UTC /etc/localtime \
     && echo "UTC" > /etc/timezone \
     && apk del tzdata
 
-RUN apk --no-cache add dcron runit \
-    && echo -e '#!/bin/sh\n\nsed '\''1d; s/Subject: cron for user root docker exec /# /; /^\s*$/d'\'' >/proc/1/fd/1' >/tmp/cron-logger \
+RUN apk --no-cache add curl dcron runit \
+    && echo -e "#!/bin/sh\\n\\nsed '1d; s/Subject: cron for user root docker exec /# /; /^\\s*\$/d' >/proc/1/fd/1" >/tmp/cron-logger \
     && chmod 755 /tmp/cron-logger \
-    \
-    && echo -e '#!/bin/sh\nexec 2>/proc/1/fd/2 >/proc/1/fd/1\n\nTARGET="$1"\nshift\nCONTAINER_ID="$1"\nshift\n\necho "Start job \"$@\" ($TARGET)"\ntime -f"Job \"$*\" ($TARGET) done in %E" docker exec "$CONTAINER_ID" "$@"' >/usr/bin/run-job \
-    && chmod 755 /usr/bin/run-job \
     \
     # runit supervisor setup
     && mkdir -p /supervisor/crond \

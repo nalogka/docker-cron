@@ -3,38 +3,35 @@
 exec 2>&1
 
 function rebuild {
-  FORMAT_ENV='{{range $idx, $var := .Config.Env}}{{if $idx}}{{"\n"}}{{end}}{{$var}}{{end}}'
   # non service task's containers
+  FORMAT='{{range $i, $var := .Config.Env}}{{if $i}}{{"\n"}}{{end}}{{$var}}{{end}}'
   docker ps -f "is-task=false" -f "status=running" --format '{{.ID}} {{.Names}}' | while read -r ID CONTAINER_NAME
   do
     SECTION_HEADER="# commands of container $CONTAINER_NAME\n"
-    docker inspect --format "$FORMAT_ENV" "$ID" | grep 'CRON_TASK_' | while IFS="=" read -r VAR VAL
+    docker inspect --format "$FORMAT" "$ID" | grep 'CRON_TASK_' | while IFS="=" read -r VAR VAL
     do
       echo "$VAL" | (
         read -r MIN HOUR DAY MONTH DOW COMMAND
         echo -ne "$SECTION_HEADER"
-        echo "$MIN $HOUR $DAY $MONTH $DOW run-job \"container $CONTAINER_NAME\" $ID $COMMAND"
+        echo "$MIN $HOUR $DAY $MONTH $DOW curl -sf $COMMAND"
       )
       SECTION_HEADER=""
     done
   done
   # service task's containers
-  docker service ls --format '{{.Name}}' 2>/dev/null | while read -r SERVICE_NAME
+  FORMAT='{{range $i, $item := .Spec.TaskTemplate.ContainerSpec.Env}}{{if $i}}{{"\n"}}{{end}}{{$item}}{{end}}'
+  docker service ls --format '{{.Name}} {{.Replicas}}' | grep -v ' 0/' | while read -r SERVICE_NAME REPLICAS
   do
-    ID=$(docker ps -f "status=running" -f "label=com.docker.swarm.service.name=$SERVICE_NAME" -ql 2>/dev/null)
-    if [ -n "$ID" ]
-    then
-      SECTION_HEADER="# commands of service $SERVICE_NAME\n"
-      docker inspect --format "$FORMAT_ENV" "$ID" | grep 'CRON_TASK_' | while IFS="=" read -r VAR VAL
-      do
-        echo "$VAL" | (
-          read -r MIN HOUR DAY MONTH DOW COMMAND
-          echo -ne "$SECTION_HEADER"
-          echo "$MIN $HOUR $DAY $MONTH $DOW run-job \"service $SERVICE_NAME\" $ID $COMMAND"
-        )
-        SECTION_HEADER=""
-      done
-    fi
+    SECTION_HEADER="# commands of service $SERVICE_NAME\n"
+    docker service inspect --format="$FORMAT" "$SERVICE_NAME" | grep 'CRON_TASK_' | while IFS="=" read -r VAR VAL
+    do
+      echo "$VAL" | (
+        read -r MIN HOUR DAY MONTH DOW COMMAND
+        echo -ne "$SECTION_HEADER"
+        echo "$MIN $HOUR $DAY $MONTH $DOW curl -sf $COMMAND"
+      )
+      SECTION_HEADER=""
+    done
   done
 }
 
@@ -53,12 +50,18 @@ RECENTLY_UPDATED_AT="$(date -u "+%Y-%m-%dT%H:%M:%SZ")"
 while true
 do
   NOW="$(date -u "+%Y-%m-%dT%H:%M:%SZ")"
-  docker events \
-      --filter "type=container" \
-      --format "{{.ID}} {{.Status}}" \
+  ( docker events \
+      --filter "type=service" \
+      --format "{{.Action}} {{index .Actor.Attributes \"updatestate.new\"}}" \
       --since "$RECENTLY_UPDATED_AT" \
       --until "$NOW" \
-    | grep -E '\b(start|die)\b' && update
+    | grep -E '^(remove |create |update completed)$' >/dev/null \
+  || docker events --filter="type=container" \
+      --format "{{if index .Actor.Attributes \"com.docker.swarm.task.id\"}}!{{end}}{{.Status}}" \
+      --since "$RECENTLY_UPDATED_AT" \
+      --until "$NOW" \
+    | grep -E '^(start|die)$' >/dev/null \
+  ) && update
   RECENTLY_UPDATED_AT="$NOW"
   sleep 5
 done
