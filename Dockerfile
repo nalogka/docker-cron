@@ -7,12 +7,27 @@ ENV LC_ALL en_US.UTF-8
 ENV LANG en_US.UTF-8
 
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
-RUN apk --no-cache add tzdata \
+
+RUN apk add --no-cache tzdata \
     && cp /usr/share/zoneinfo/Etc/UTC /etc/localtime \
     && echo "UTC" > /etc/timezone \
     && apk del tzdata
 
-RUN apk --no-cache add curl dcron runit \
+RUN apk add --no-cache --virtual .gettext gettext \
+    && mv /usr/bin/envsubst /tmp/ \
+    \
+    && runDeps="$( \
+        scanelf --needed --nobanner /tmp/envsubst \
+            | awk '{ gsub(/,/, "\nso:", $2); print "so:" $2 }' \
+            | sort -u \
+            | xargs -r apk info --installed \
+            | sort -u \
+    )" \
+    && apk add --no-cache $runDeps \
+    && apk del .gettext \
+    && mv /tmp/envsubst /usr/local/bin/
+
+RUN apk add --no-cache curl dcron runit \
     && echo -e "#!/bin/sh\\n\\nsed '1d; s/Subject: cron for user root docker exec /# /; /^\\s*\$/d' >/proc/1/fd/1" >/tmp/cron-logger \
     && chmod 755 /tmp/cron-logger \
     \
