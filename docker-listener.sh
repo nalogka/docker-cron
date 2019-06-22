@@ -5,7 +5,7 @@ REPEAT_INTERVAL=5 # seconds
 exec 2>&1
 
 function import_env {
-  while read -r V; do [ -n "$V" ] && export "$V"; done
+  while read -r V; do [ -n "$V" ] && echo "$V" | grep -E '^\w+=' > /dev/null && export "$V"; done
 }
 
 function parse_tasks {
