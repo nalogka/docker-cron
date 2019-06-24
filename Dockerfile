@@ -28,7 +28,7 @@ RUN apk add --no-cache --virtual .gettext gettext \
     && mv /tmp/envsubst /usr/local/bin/
 
 RUN apk add --no-cache curl dcron runit \
-    && echo -e "#!/bin/sh\\n\\nsed '1d; s/Subject: cron for user root docker exec /# /; /^\\s*\$/d' >/proc/1/fd/1" >/tmp/cron-logger \
+    && echo -e "#!/bin/sh\\n\\nsed '1d; 2s/Subject: cron for user root /# /; 3d; 4,\$s/^/  | /' >/proc/1/fd/1" >/tmp/cron-logger \
     && chmod 755 /tmp/cron-logger \
     \
     # runit supervisor setup
