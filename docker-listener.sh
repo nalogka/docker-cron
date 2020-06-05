@@ -37,7 +37,7 @@ function rebuild {
   # service task's containers
   docker info 2>/dev/null | grep 'Is Manager: true' >/dev/null && (
     FORMAT='{{range $i, $item := .Spec.TaskTemplate.ContainerSpec.Env}}{{if $i}}{{"\n"}}{{end}}{{$item}}{{end}}'
-    docker service ls --format '{{.Name}} {{.Replicas}}' | grep -v ' 0/' | while read -r SERVICE_NAME REPLICAS
+    docker service ls --format '{{.Name}} {{.Replicas}}' | grep -v '/0 ' | while read -r SERVICE_NAME REPLICAS
     do
       docker service inspect --format="$FORMAT" "$SERVICE_NAME" | grep -v '^CRON_TASK_' | (
         import_env
