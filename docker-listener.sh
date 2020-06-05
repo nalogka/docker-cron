@@ -48,8 +48,9 @@ function rebuild {
 }
 
 function update {
-  rebuild | crontab -
-  echo 'crontab updated'
+  echo 'crontab update on' "$@"
+  
+  rebuild | tee /dev/stderr | crontab -
 }
 
 update
@@ -58,18 +59,22 @@ RECENTLY_UPDATED_AT="$(date -u "+%Y-%m-%dT%H:%M:%SZ")"
 while true
 do
   NOW="$(date -u "+%Y-%m-%dT%H:%M:%SZ")"
-  ( docker events \
-      --filter "type=service" \
-      --format "{{.Action}} {{index .Actor.Attributes \"updatestate.new\"}}" \
-      --since "$RECENTLY_UPDATED_AT" \
-      --until "$NOW" \
-    | grep -E '^(remove |create |update completed)$' >/dev/null \
-  || docker events --filter="type=container" \
-      --format "{{if index .Actor.Attributes \"com.docker.swarm.task.id\"}}!{{end}}{{.Status}}" \
-      --since "$RECENTLY_UPDATED_AT" \
-      --until "$NOW" \
-    | grep -E '^(start|die)$' >/dev/null \
-  ) && update
+  EVENTS=$(
+    docker events \
+        --filter "type=service" \
+        --format "{{.Action}} {{index .Actor.Attributes \"updatestate.new\"}} {{ .Actor.Attributes.name }}" \
+        --since "$RECENTLY_UPDATED_AT" \
+        --until "$NOW" \
+      | grep -E '^(remove |create |update completed) '
+    HAS_SERVICES_UPDATED=$?
+    docker events --filter="type=container" \
+        --format "{{if index .Actor.Attributes \"com.docker.swarm.task.id\"}}?{{end}}{{.Status}} {{ .Actor.Attributes.name }}" \
+        --since "$RECENTLY_UPDATED_AT" \
+        --until "$NOW" \
+      | grep -E '^(start|die) '
+    HAS_CONTAINERS_UPDATED=$?
+    [ $HAS_CONTAINERS_UPDATED -eq 0 -o $HAS_SERVICES_UPDATED -eq 0 ]
+  ) && update $(echo "$EVENTS" | sed ':a;$!N;s/\n/, /;ta')
   RECENTLY_UPDATED_AT="$NOW"
   sleep "$REPEAT_INTERVAL"
 done
