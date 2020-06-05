@@ -1,6 +1,6 @@
 #!/bin/sh
 
-REPEAT_INTERVAL=5 # seconds
+REPEAT_INTERVAL=7 # seconds
 
 exec 2>&1
 
