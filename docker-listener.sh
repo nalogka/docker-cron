@@ -53,8 +53,8 @@ function update {
   rebuild | tee /dev/stderr | crontab -
 }
 
-update
 RECENTLY_UPDATED_AT="$(date -u "+%Y-%m-%dT%H:%M:%SZ")"
+update cron service start
 
 while true
 do
