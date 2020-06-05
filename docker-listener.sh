@@ -50,7 +50,7 @@ function rebuild {
 function update {
   echo 'crontab update on' "$@"
   
-  rebuild | tee /dev/stderr | crontab -
+  rebuild | crontab -
 }
 
 RECENTLY_UPDATED_AT="$(date -u "+%Y-%m-%dT%H:%M:%SZ")"
