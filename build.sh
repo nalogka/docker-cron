@@ -8,7 +8,7 @@ IMAGE_IDX=0
 PULL_OPT="--pull"
 for DOCKERFILE in Dockerfile
 do
-  TAG="docker.nalogka.com/cron:latest"
+  TAG="cr.yandex/crpsernav4j2pmc2qpv1/cron:stable"
   docker build $PULL_OPT -f "$DOCKERFILE" -t "$TAG" . || die "Image build failed"
   IMAGES[$IMAGE_IDX]="$TAG"; ((IMAGE_IDX++));
   PULL_OPT=""
